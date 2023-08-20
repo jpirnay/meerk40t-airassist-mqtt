@@ -263,3 +263,4 @@ def register_gui_stuff(module):
     ):
         display_config_dialog(context, coolid)
         return None
+
