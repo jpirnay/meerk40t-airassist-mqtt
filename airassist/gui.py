@@ -21,7 +21,7 @@ class ConfigDialog(wx.Dialog):
         vsizer_left = wx.BoxSizer(wx.VERTICAL)
         sizer_main.Add(vsizer_left, 1, wx.EXPAND, 0)
 
-        sizer_id = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, _("Command to turn off")), wx.VERTICAL)
+        sizer_id = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, _("Identifier")), wx.VERTICAL)
         vsizer_left.Add(sizer_id, 0, wx.EXPAND, 0)
 
         hsizer_id = wx.BoxSizer(wx.HORIZONTAL)
@@ -56,7 +56,7 @@ class ConfigDialog(wx.Dialog):
         lbl_port.SetMinSize((70, -1))
         hsizer_port.Add(lbl_port, 0, wx.ALIGN_CENTER_VERTICAL, 0)
 
-        self.text_port = wx.TextCtrl(self, wx.ID_ANY, _("1883"))
+        self.text_port = wx.TextCtrl(self, wx.ID_ANY, "1883")
         self.text_port.SetToolTip(_("Port to connect to (default 1883)"))
         hsizer_port.Add(self.text_port, 0, wx.EXPAND, 0)
 
@@ -81,7 +81,7 @@ class ConfigDialog(wx.Dialog):
         lbl_pass.SetMinSize((70, -1))
         hsizer_pass.Add(lbl_pass, 0, wx.ALIGN_CENTER_VERTICAL, 0)
 
-        self.text_password = wx.TextCtrl(self, wx.ID_ANY, _("1883"))
+        self.text_password = wx.TextCtrl(self, wx.ID_ANY)
         self.text_password.SetToolTip(_("(Optional) Password to identify"))
         hsizer_pass.Add(self.text_password, 1, wx.EXPAND, 0)
 
