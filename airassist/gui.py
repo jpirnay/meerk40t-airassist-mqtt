@@ -8,13 +8,20 @@ class ConfigDialog(wx.Dialog):
     # from meerk40t.gui.wxutils import TextCtrl
 
     def __init__(self, context, coolid, *args, **kwds):
-        self.context = context
-        self.coolid = coolid
-        self.entries = {}
-        self.client = mqtt.Client("meerk40t")
-
         # begin wxGlade: RefAlign.__init__
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_DIALOG_STYLE
+
+        self.context = context
+        self.coolid = coolid
+        if context is not None and hasattr(context, "kernel"):
+            self.storage = context.kernel.settings
+        else:
+            self.storage = None
+        self.entries = {}
+        self.identifier = "airassist-mqtt"
+
+        self.client = mqtt.Client("meerk40t")
+
         wx.Dialog.__init__(self, *args, **kwds)
 
         self.SetTitle(_("Manage MQTT-Interfaces"))
@@ -93,7 +100,7 @@ class ConfigDialog(wx.Dialog):
         hsizer_topic_1 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_on.Add(hsizer_topic_1, 1, wx.EXPAND, 0)
 
-        lbl_subject_on = wx.StaticText(self, wx.ID_ANY, _("Subject"))
+        lbl_subject_on = wx.StaticText(self, wx.ID_ANY, _("Topic"))
         lbl_subject_on.SetMinSize((70, -1))
         hsizer_topic_1.Add(lbl_subject_on, 0, wx.ALIGN_CENTER_VERTICAL, 0)
 
@@ -120,7 +127,7 @@ class ConfigDialog(wx.Dialog):
         hsizer_topic_2 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_off.Add(hsizer_topic_2, 1, wx.EXPAND, 0)
 
-        lbl_subject_off = wx.StaticText(self, wx.ID_ANY, _("Subject"))
+        lbl_subject_off = wx.StaticText(self, wx.ID_ANY, _("Topic"))
         lbl_subject_off.SetMinSize((70, -1))
         hsizer_topic_2.Add(lbl_subject_off, 0, wx.ALIGN_CENTER_VERTICAL, 0)
 
@@ -147,7 +154,7 @@ class ConfigDialog(wx.Dialog):
         vsizer_right = wx.BoxSizer(wx.VERTICAL)
         sizer_main.Add(vsizer_right, 1, wx.EXPAND, 0)
 
-        self.list_entries = wx.ListBox(self, wx.ID_ANY, choices=[_("choice 1")])
+        self.list_entries = wx.ListBox(self, wx.ID_ANY)
         self.list_entries.SetToolTip(_("Select the entry to edit"))
         vsizer_right.Add(self.list_entries, 1, wx.EXPAND, 0)
 
@@ -173,7 +180,7 @@ class ConfigDialog(wx.Dialog):
 
         self.Layout()
 
-        self.fill_data()
+        self.fill_data(True)
 
         self.text_id.Bind(wx.EVT_TEXT, self.on_changes)
         self.text_address.Bind(wx.EVT_TEXT, self.on_changes)
@@ -182,7 +189,7 @@ class ConfigDialog(wx.Dialog):
         self.text_payload_on.Bind(wx.EVT_TEXT, self.on_changes)
         self.text_subject_off.Bind(wx.EVT_TEXT, self.on_changes)
         self.text_payload_off.Bind(wx.EVT_TEXT, self.on_changes)
-        self.btn_apply.Bind(wx.EVT_BUTTON, self.on_btn_apply)
+        self.btn_apply.Bind(wx.EVT_BUTTON, self.on_button_apply)
         self.list_entries.Bind(wx.EVT_LISTBOX, self.on_list_select)
         self.btn_ok.Bind(wx.EVT_BUTTON, self.on_button_okay)
         self.btn_add.Bind(wx.EVT_BUTTON, self.on_button_add)
@@ -215,11 +222,34 @@ class ConfigDialog(wx.Dialog):
         flag2 = flag2 and len(self.text_payload_off.GetValue()) > 0
         self.btn_test_off.Enable(flag2)
 
-    def fill_data(self):
-        self.entries.clear()
+    def fill_data(self, clearit=False):
+        if clearit:
+            self.entries.clear()
+            section = self.identifier
+            if self.storage is not None:
+                info = self.storage.read_persistent_string_dict(section)
+                if info is not None and len(info) > 0:
+                    print (info)
+                    for key in info:
+                        secs = key.split("/")
+                        if len(secs) > 0:
+                            skey = secs[-1]
+                            entry = self.storage.read_persistent(tuple, section, skey, None)
+                            print (f"Reading {skey}: {entry}")
+                            if entry is not None:
+                                self.entries[skey] = entry
+        choices = list(self.entries.keys())
+        self.list_entries.Set(choices)
+        if len(choices):
+            self.list_entries.SetSelection(0)
+            self.on_list_select(None)
 
     def store_data(self):
-        return
+        section = self.identifier
+        if self.storage is not None:
+            self.storage.clear_persistent(section)
+            for key, entry in self.entries.items():
+                self.storage.write_persistent(section, key, entry)
 
     def execute(self, subject, payload):
         if self.client.is_connected():
@@ -258,7 +288,7 @@ class ConfigDialog(wx.Dialog):
         msg = self.text_payload_off.GetValue()
         self.execute(subj, msg)
 
-    def on_btn_apply(self, event):  # wxGlade: MQTTOptionPanel.<event_handler>
+    def on_button_apply(self, event):  # wxGlade: MQTTOptionPanel.<event_handler>
         this_id = self.text_id.GetValue()
         reload_needed = False
         if self.coolid is None:
@@ -285,11 +315,11 @@ class ConfigDialog(wx.Dialog):
             )
             if answer == wx.ID_YES:
                 self.coolid = this_id
-                reload_neeeded = True
+                reload_needed = True
         self.entries[self.coolid] = newentry
         self.store_data()
         if reload_needed:
-            self.fill_data()
+            self.fill_data(False)
 
     def on_list_select(self, event):
         if self.client.is_connected():
@@ -298,31 +328,35 @@ class ConfigDialog(wx.Dialog):
         if idx < 0:
             return
         try:
-            self.coolid = self.entries.keys(idx)
+            self.coolid = list(self.entries.keys())[idx]
         except IndexError:
             return
-        entry = self.entries[self.coolid]
-        self.text_address.SetValue(self.coolid),
-        self.text_port.SetValue(entry[0])
-        self.text_username.SetValue(entry[1])
-        self.text_password.SetValue(entry[2])
-        self.text_subject_on.SetValue(entry[3])
-        self.text_payload_on.SetValue(entry[4])
-        self.text_subject_off.SetValue(entry[5])
-        self.text_payload_off.SetValue(entry[6])
+        try:
+            entry = self.entries[self.coolid]
+        except IndexError:
+            return
+        self.text_id.SetValue(self.coolid)
+        self.text_address.SetValue(entry[0])
+        self.text_port.SetValue(entry[1])
+        self.text_username.SetValue(entry[2])
+        self.text_password.SetValue(entry[3])
+        self.text_subject_on.SetValue(entry[4])
+        self.text_payload_on.SetValue(entry[5])
+        self.text_subject_off.SetValue(entry[6])
+        self.text_payload_off.SetValue(entry[7])
 
     def on_button_okay(self, event):
         self.Close()
 
     def on_button_add(self, event):
         # Save the current entry
-        self.on_btn_apply(None)
+        self.on_button_apply(None)
         if self.coolid is not None:
             newid = self.coolid
             newentry = self.entries[self.coolid]
         else:
             newid = "mqtt-airassist"
-            newentry = ["192.168.0.100", "1883", "", "", "/workshop/tasmota-switch/cmnd", "ON", "/workshop/tasmota-switch/cmnd", "OFF"]
+            newentry = ["192.168.0.38", "1883", "", "", "cmnd/airassist/POWER", "ON", "cmnd/airassist/POWER", "OFF"]
         newcounter = 0
         while newid in self.entries:
             newcounter += 1
@@ -336,7 +370,7 @@ class ConfigDialog(wx.Dialog):
                         idx1 = idx2
                 if idx1 >= 0:
                     newid = newid[:idx1]
-            newid += f"({newcounter}"
+            newid += f"({newcounter})"
         try:
             self.entries[newid] = newentry
         except IndexError:
@@ -344,7 +378,7 @@ class ConfigDialog(wx.Dialog):
             return
         self.store_data()
         self.coolid = newid
-        self.fill_data()
+        self.fill_data(False)
         self.text_id.SetFocus()
 
     def on_button_remove(self, event):
@@ -357,6 +391,6 @@ class ConfigDialog(wx.Dialog):
         self.store_data()
         self.coolid = None
         if len(self.entries):
-            self.coolid = self.entries.keys(0)
-        self.fill_data()
+            self.coolid = list(self.entries.keys())[0]
+        self.fill_data(False)
 
