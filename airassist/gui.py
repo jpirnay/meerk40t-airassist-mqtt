@@ -394,3 +394,5 @@ class ConfigDialog(wx.Dialog):
             self.coolid = list(self.entries.keys())[0]
         self.fill_data(False)
 
+    def submenu():
+        return "Air-Assist", "MQTT-Interface"
