@@ -1,4 +1,5 @@
 import wx
+import paho.mqtt.client as mqtt
 
 _ = wx.GetTranslation
 
@@ -10,6 +11,7 @@ class ConfigDialog(wx.Dialog):
         self.context = context
         self.coolid = coolid
         self.entries = {}
+        self.client = mqtt.Client("meerk40t")
 
         # begin wxGlade: RefAlign.__init__
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_DIALOG_STYLE
@@ -108,6 +110,9 @@ class ConfigDialog(wx.Dialog):
         self.text_payload_on = wx.TextCtrl(self, wx.ID_ANY, _("ON"))
         self.text_payload_on.SetToolTip(_("What is the payload to send?"))
         hsizer_payload_1.Add(self.text_payload_on, 1, wx.EXPAND, 0)
+        self.btn_test_on = wx.Button(self, wx.ID_ANY, _("Test"))
+        self.btn_test_on.SetToolTip(_("Test it out and send the command"))
+        hsizer_payload_1.Add(self.btn_test_on, 0, wx.EXPAND, 0)
 
         sizer_off = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, _("Command to turn off")), wx.VERTICAL)
         vsizer_left.Add(sizer_off, 0, wx.EXPAND, 0)
@@ -132,6 +137,9 @@ class ConfigDialog(wx.Dialog):
         self.text_payload_off = wx.TextCtrl(self, wx.ID_ANY, _("OFF"))
         self.text_payload_off.SetToolTip(_("What is the payload to send?"))
         hsizer_payload_2.Add(self.text_payload_off, 1, wx.EXPAND, 0)
+        self.btn_test_off = wx.Button(self, wx.ID_ANY, _("Test"))
+        self.btn_test_off.SetToolTip(_("Test it out and send the command"))
+        hsizer_payload_2.Add(self.btn_test_off, 0, wx.EXPAND, 0)
 
         self.btn_apply = wx.Button(self, wx.ID_ANY, _("Apply"))
         vsizer_left.Add(self.btn_apply, 0, wx.ALIGN_RIGHT, 0)
@@ -179,19 +187,76 @@ class ConfigDialog(wx.Dialog):
         self.btn_ok.Bind(wx.EVT_BUTTON, self.on_button_okay)
         self.btn_add.Bind(wx.EVT_BUTTON, self.on_button_add)
         self.btn_remove.Bind(wx.EVT_BUTTON, self.on_button_remove)
+        self.btn_test_on.Bind(wx.EVT_BUTTON, self.on_button_test_on)
+        self.btn_test_off.Bind(wx.EVT_BUTTON, self.on_button_test_off)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+        self.on_changes(None)
 
-    def on_changes(self, event):  # wxGlade: MQTTOptionPanel.<event_handler>
+    def on_close(self, event):
+        if self.client and self.client.is_connected():
+            self.client.disconnect()
+        del self.client
+        event.Skip()
+
+    def on_changes(self, event):
         flag = True
         flag = flag and len(self.text_address.GetValue()) > 0
         flag = flag and len(self.text_subject_on.GetValue()) > 0
         flag = flag and len(self.text_subject_off.GetValue()) > 0
         self.btn_apply.Enable(flag)
+        flag1 = True
+        flag1 = flag1 and len(self.text_address.GetValue()) > 0
+        flag1 = flag1 and len(self.text_subject_on.GetValue()) > 0
+        flag1 = flag1 and len(self.text_payload_on.GetValue()) > 0
+        self.btn_test_on.Enable(flag1)
+        flag2 = True
+        flag2 = flag2 and len(self.text_address.GetValue()) > 0
+        flag2 = flag2 and len(self.text_subject_off.GetValue()) > 0
+        flag2 = flag2 and len(self.text_payload_off.GetValue()) > 0
+        self.btn_test_off.Enable(flag2)
 
     def fill_data(self):
         self.entries.clear()
 
     def store_data(self):
         return
+
+    def execute(self, subject, payload):
+        if self.client.is_connected():
+            self.client.disconnect()
+        server = self.text_address.GetValue()
+        pp = self.text_port.GetValue()
+        port = 1883
+        if pp:
+            try:
+                port = int(pp)
+            except ValueError:
+                pass
+        usr_name = self.text_username.GetValue()
+        usr_pass = self.text_password.GetValue()
+        self.client.username_pw_set(usr_name, usr_pass)
+        try:
+            self.client.connect(server, port)
+        except:
+            wx.MessageBox(_("Could not connect to the mqtt broker"), "Error", style = wx.OK | wx.ICON_ERROR)
+            return
+        try:
+            self.client.publish(subject, payload)
+            self.client.loop()
+        except:
+            wx.MessageBox(_("Could not send {subject}/{payload}"), "Error", style = wx.OK | wx.ICON_ERROR)
+            return
+        wx.MessageBox(_("Sucessfully sent {subject}/{payload}\nNow look at the result."), "Success", style = wx.OK | wx.ICON_INFORMATION)
+
+    def on_button_test_on(self, event):
+        subj = self.text_subject_on.GetValue()
+        msg = self.text_payload_on.GetValue()
+        self.execute(subj, msg)
+
+    def on_button_test_off(self, event):
+        subj = self.text_subject_off.GetValue()
+        msg = self.text_payload_off.GetValue()
+        self.execute(subj, msg)
 
     def on_btn_apply(self, event):  # wxGlade: MQTTOptionPanel.<event_handler>
         this_id = self.text_id.GetValue()
@@ -224,9 +289,11 @@ class ConfigDialog(wx.Dialog):
         self.entries[self.coolid] = newentry
         self.store_data()
         if reload_needed:
-            self.load_data()
+            self.fill_data()
 
     def on_list_select(self, event):
+        if self.client.is_connected():
+            self.client.disconnect()
         idx = self.list_entries.GetSelection()
         if idx < 0:
             return
