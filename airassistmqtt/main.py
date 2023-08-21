@@ -227,11 +227,14 @@ def register_coolant_support(kernel):
     from .mqtt_logic import AirAssist
 
     _ = kernel.translation
+    print ("Register coolant")
 
 def register_gui_stuff(module):
     import wx
 
     from .gui import ConfigDialog
+
+    print ("Register GUI")
 
     context = module.context
     kernel = context._kernel

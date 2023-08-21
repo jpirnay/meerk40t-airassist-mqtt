@@ -1,7 +1,7 @@
 def main():
     import wx
 
-    from airassist.gui import ConfigDialog
+    from airassistmqtt.gui import ConfigDialog
     context = None
     coolid = None
     app = wx.App()
