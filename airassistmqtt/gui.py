@@ -13,14 +13,14 @@ class ConfigDialog(wx.Dialog):
 
         self.context = context
         self.coolid = coolid
-        if context is not None and hasattr(context, "kernel"):
-            self.storage = context.kernel.settings
+        if context is not None and hasattr(context, "root"):
+            self.storage = context.root.settings
         else:
             self.storage = None
         self.entries = {}
         self.identifier = "airassist-mqtt"
 
-        self.client = mqtt.Client("meerk40t")
+        self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, client_id="meerk40t", )
 
         wx.Dialog.__init__(self, *args, **kwds)
 
