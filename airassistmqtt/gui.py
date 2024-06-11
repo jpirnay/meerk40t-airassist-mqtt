@@ -274,9 +274,9 @@ class ConfigDialog(wx.Dialog):
             self.client.publish(subject, payload)
             self.client.loop()
         except:
-            wx.MessageBox(_("Could not send {subject}/{payload}"), "Error", style = wx.OK | wx.ICON_ERROR)
+            wx.MessageBox(_("Could not send {subject}/{payload}").format(subject=subject, payload=payload), "Error", style = wx.OK | wx.ICON_ERROR)
             return
-        wx.MessageBox(_("Sucessfully sent {subject}/{payload}\nNow look at the result."), "Success", style = wx.OK | wx.ICON_INFORMATION)
+        wx.MessageBox(_("Sucessfully sent {subject}/{payload}\nNow look at the result.").format(subject=subject, payload=payload), "Success", style = wx.OK | wx.ICON_INFORMATION)
 
     def on_button_test_on(self, event):
         subj = self.text_subject_on.GetValue()
